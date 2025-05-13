@@ -8,7 +8,12 @@ use crate::Bytes;
 #[derive(rlp::RlpEncodable, rlp::RlpDecodable)]
 #[cfg_attr(
 	feature = "with-scale",
-	derive(scale_codec::Encode, scale_codec::Decode, scale_info::TypeInfo)
+	derive(
+		scale_codec::Encode,
+		scale_codec::Decode,
+		scale_codec::DecodeWithMemTracking,
+		scale_info::TypeInfo
+	)
 )]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Log {

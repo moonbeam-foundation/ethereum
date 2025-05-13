@@ -9,7 +9,12 @@ use crate::Bytes;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(
 	feature = "with-scale",
-	derive(scale_codec::Encode, scale_codec::Decode, scale_info::TypeInfo)
+	derive(
+		scale_codec::Encode,
+		scale_codec::Decode,
+		scale_codec::DecodeWithMemTracking,
+		scale_info::TypeInfo
+	)
 )]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TransactionAction {
@@ -45,7 +50,12 @@ impl rlp::Decodable for TransactionAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(
 	feature = "with-scale",
-	derive(scale_codec::Encode, scale_codec::Decode, scale_info::TypeInfo)
+	derive(
+		scale_codec::Encode,
+		scale_codec::Decode,
+		scale_codec::DecodeWithMemTracking,
+		scale_info::TypeInfo
+	)
 )]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransactionRecoveryId(pub u64);
@@ -77,7 +87,10 @@ impl TransactionRecoveryId {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "with-scale", derive(scale_info::TypeInfo))]
+#[cfg_attr(
+	feature = "with-scale",
+	derive(scale_info::TypeInfo, scale_codec::DecodeWithMemTracking)
+)]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransactionSignature {
 	v: TransactionRecoveryId,
@@ -171,7 +184,12 @@ impl scale_codec::Decode for TransactionSignature {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
 	feature = "with-scale",
-	derive(scale_codec::Encode, scale_codec::Decode, scale_info::TypeInfo)
+	derive(
+		scale_codec::Encode,
+		scale_codec::Decode,
+		scale_codec::DecodeWithMemTracking,
+		scale_info::TypeInfo
+	)
 )]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LegacyTransaction {
