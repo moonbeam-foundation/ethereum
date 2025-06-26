@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
 use ethereum_types::{Address, H256, U256};
+use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
 use rlp::{DecoderError, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 
@@ -8,6 +9,20 @@ use crate::{
 	transaction::{AccessList, TransactionAction},
 	Bytes,
 };
+
+/// Error type for EIP-7702 authorization signature recovery
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum AuthorizationError {
+	/// Invalid signature format
+	InvalidSignature,
+	/// Invalid recovery ID
+	InvalidRecoveryId,
+	/// Signature recovery failed
+	RecoveryFailed,
+	/// Invalid public key format
+	InvalidPublicKey,
+}
 
 /// EIP-7702 transaction type as defined in the specification
 pub const SET_CODE_TX_TYPE: u8 = 0x04;
@@ -61,6 +76,72 @@ impl rlp::Decodable for AuthorizationListItem {
 			r: H256::from(rlp.val_at::<U256>(4)?.to_big_endian()),
 			s: H256::from(rlp.val_at::<U256>(5)?.to_big_endian()),
 		})
+	}
+}
+
+impl AuthorizationListItem {
+	/// Recover the authorizing address from the authorization signature according to EIP-7702
+	pub fn authorizing_address(&self) -> Result<Address, AuthorizationError> {
+		// Create the authorization message hash according to EIP-7702
+		let message_hash = self.authorization_message_hash();
+
+		// Create signature from r and s components
+		let mut signature_bytes = [0u8; 64];
+		signature_bytes[0..32].copy_from_slice(&self.r[..]);
+		signature_bytes[32..64].copy_from_slice(&self.s[..]);
+
+		// Create the signature and recovery ID
+		let signature = Signature::from_bytes(&signature_bytes.into())
+			.map_err(|_| AuthorizationError::InvalidSignature)?;
+
+		let recovery_id = RecoveryId::try_from(if self.y_parity { 1u8 } else { 0u8 })
+			.map_err(|_| AuthorizationError::InvalidRecoveryId)?;
+
+		// Recover the verifying key using VerifyingKey::recover_from_prehash
+		// message_hash is already a 32-byte Keccak256 hash, so we use recover_from_prehash
+		let verifying_key =
+			VerifyingKey::recover_from_prehash(message_hash.as_bytes(), &signature, recovery_id)
+				.map_err(|_| AuthorizationError::RecoveryFailed)?;
+
+		// Convert public key to Ethereum address
+		Self::verifying_key_to_address(&verifying_key)
+	}
+
+	/// Create the authorization message hash according to EIP-7702
+	pub fn authorization_message_hash(&self) -> H256 {
+		// EIP-7702 authorization message format:
+		// MAGIC || rlp([chain_id, address, nonce])
+		let mut message = alloc::vec![AUTHORIZATION_MAGIC];
+
+		// RLP encode the authorization tuple
+		let mut rlp_stream = RlpStream::new_list(3);
+		rlp_stream.append(&self.chain_id);
+		rlp_stream.append(&self.address);
+		rlp_stream.append(&self.nonce);
+		message.extend_from_slice(&rlp_stream.out());
+
+		// Return keccak256 hash of the complete message
+		H256::from_slice(Keccak256::digest(&message).as_slice())
+	}
+
+	/// Convert VerifyingKey to Ethereum address
+	fn verifying_key_to_address(
+		verifying_key: &VerifyingKey,
+	) -> Result<Address, AuthorizationError> {
+		// Convert public key to bytes (uncompressed format, skip the 0x04 prefix)
+		let pubkey_point = verifying_key.to_encoded_point(false);
+		let pubkey_bytes = pubkey_point.as_bytes();
+
+		// pubkey_bytes is 65 bytes: [0x04, x_coord (32 bytes), y_coord (32 bytes)]
+		// We want just the x and y coordinates (64 bytes total)
+		if pubkey_bytes.len() >= 65 && pubkey_bytes[0] == 0x04 {
+			let pubkey_coords = &pubkey_bytes[1..65];
+			// Ethereum address is the last 20 bytes of keccak256(pubkey)
+			let hash = Keccak256::digest(pubkey_coords);
+			Ok(Address::from_slice(&hash[12..]))
+		} else {
+			Err(AuthorizationError::InvalidPublicKey)
+		}
 	}
 }
 
@@ -204,5 +285,120 @@ impl rlp::Encodable for EIP7702TransactionMessage {
 impl From<EIP7702Transaction> for EIP7702TransactionMessage {
 	fn from(t: EIP7702Transaction) -> Self {
 		t.to_message()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use ethereum_types::{Address, H256, U256};
+
+	#[test]
+	fn test_authorizing_address_with_real_signature() {
+		use k256::ecdsa::SigningKey;
+		use k256::elliptic_curve::SecretKey;
+
+		// Use a fixed test private key for deterministic testing
+		let private_key_bytes = [
+			0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+			0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c,
+			0x1d, 0x1e, 0x1f, 0x20,
+		];
+
+		let secret_key =
+			SecretKey::from_bytes(&private_key_bytes.into()).expect("Invalid private key");
+		let signing_key = SigningKey::from(secret_key);
+		let verifying_key = signing_key.verifying_key();
+
+		// Create authorization data
+		let chain_id = 1u64;
+		let address = Address::from_slice(&[0x42u8; 20]);
+		let nonce = U256::zero();
+
+		// Create the EIP-7702 authorization message hash
+		let mut message = alloc::vec![AUTHORIZATION_MAGIC];
+		let mut rlp_stream = RlpStream::new_list(3);
+		rlp_stream.append(&chain_id);
+		rlp_stream.append(&address);
+		rlp_stream.append(&nonce);
+		message.extend_from_slice(&rlp_stream.out());
+		let message_hash = H256::from_slice(Keccak256::digest(&message).as_slice());
+
+		// Sign the message hash
+		let (signature, recovery_id) = signing_key
+			.sign_prehash_recoverable(message_hash.as_bytes())
+			.expect("Failed to sign message");
+
+		// Extract signature components
+		let signature_bytes = signature.to_bytes();
+		let r = H256::from_slice(&signature_bytes[0..32]);
+		let s = H256::from_slice(&signature_bytes[32..64]);
+		let y_parity = recovery_id.is_y_odd();
+
+		// Create AuthorizationListItem with real signature
+		let auth_item = AuthorizationListItem {
+			chain_id,
+			address,
+			nonce,
+			y_parity,
+			r,
+			s,
+		};
+
+		// Recover the authorizing address
+		let recovered_address = auth_item
+			.authorizing_address()
+			.expect("Failed to recover authorizing address");
+
+		// Convert the original verifying key to an Ethereum address for comparison
+		let expected_address = AuthorizationListItem::verifying_key_to_address(&verifying_key)
+			.expect("Failed to convert verifying key to address");
+
+		// Verify that the recovered address matches the original signer
+		assert_eq!(recovered_address, expected_address);
+		assert_ne!(recovered_address, Address::zero());
+
+		// For deterministic testing, verify specific expected values
+		// This ensures the implementation is working correctly with known inputs
+		assert_eq!(
+			expected_address,
+			Address::from_slice(&hex_literal::hex!(
+				"6370ef2f4db3611d657b90667de398a2cc2a370c"
+			))
+		);
+	}
+
+	#[test]
+	fn test_authorizing_address_error_handling() {
+		// Test with invalid signature components (zero values are invalid in ECDSA)
+		let auth_item = AuthorizationListItem {
+			chain_id: 1,
+			address: Address::from_slice(&[0x42u8; 20]),
+			nonce: U256::zero(),
+			y_parity: false,
+			r: H256::zero(), // Invalid r value (r cannot be zero)
+			s: H256::zero(), // Invalid s value (s cannot be zero)
+		};
+
+		// This should return an error due to invalid signature
+		let result = auth_item.authorizing_address();
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), AuthorizationError::InvalidSignature);
+
+		// Test with values that are too high (greater than secp256k1 curve order)
+		// secp256k1 curve order is FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+		let auth_item_high_values = AuthorizationListItem {
+			chain_id: 1,
+			address: Address::from_slice(&[0x42u8; 20]),
+			nonce: U256::zero(),
+			y_parity: false,
+			// Use maximum possible values which exceed the curve order
+			r: H256::from_slice(&[0xFF; 32]),
+			s: H256::from_slice(&[0xFF; 32]),
+		};
+
+		let result = auth_item_high_values.authorizing_address();
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), AuthorizationError::InvalidSignature);
 	}
 }
