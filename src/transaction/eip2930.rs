@@ -18,9 +18,13 @@ pub use super::legacy::TransactionAction;
 		scale_codec::DecodeWithMemTracking
 	)
 )]
-#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "with-serde",
+	derive(serde::Serialize, serde::Deserialize),
+	serde(rename_all = "camelCase")
+)]
 pub struct MalleableTransactionSignature {
-	pub odd_y_parity: bool,
+	pub y_parity: bool,
 	pub r: H256,
 	pub s: H256,
 }
@@ -36,14 +40,14 @@ pub struct MalleableTransactionSignature {
 )]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize))]
 pub struct TransactionSignature {
-	odd_y_parity: bool,
+	y_parity: bool,
 	r: H256,
 	s: H256,
 }
 
 impl TransactionSignature {
 	#[must_use]
-	pub fn new(odd_y_parity: bool, r: H256, s: H256) -> Option<Self> {
+	pub fn new(y_parity: bool, r: H256, s: H256) -> Option<Self> {
 		const LOWER: H256 = H256([
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -58,15 +62,15 @@ impl TransactionSignature {
 		let is_valid = r < UPPER && r >= LOWER && s < UPPER && s >= LOWER;
 
 		if is_valid {
-			Some(Self { odd_y_parity, r, s })
+			Some(Self { y_parity, r, s })
 		} else {
 			None
 		}
 	}
 
 	#[must_use]
-	pub fn odd_y_parity(&self) -> bool {
-		self.odd_y_parity
+	pub fn y_parity(&self) -> bool {
+		self.y_parity
 	}
 
 	#[must_use]
@@ -95,7 +99,7 @@ impl TransactionSignature {
 impl scale_codec::Decode for TransactionSignature {
 	fn decode<I: scale_codec::Input>(value: &mut I) -> Result<Self, scale_codec::Error> {
 		let unchecked = MalleableTransactionSignature::decode(value)?;
-		match Self::new(unchecked.odd_y_parity, unchecked.r, unchecked.s) {
+		match Self::new(unchecked.y_parity, unchecked.r, unchecked.s) {
 			Some(signature) => Ok(signature),
 			None => Err(scale_codec::Error::from("Invalid signature")),
 		}
@@ -110,7 +114,7 @@ impl<'de> serde::Deserialize<'de> for TransactionSignature {
 	{
 		let unchecked = MalleableTransactionSignature::deserialize(deserializer)?;
 		Ok(
-			TransactionSignature::new(unchecked.odd_y_parity, unchecked.r, unchecked.s)
+			TransactionSignature::new(unchecked.y_parity, unchecked.r, unchecked.s)
 				.ok_or(serde::de::Error::custom("invalid signature"))?,
 		)
 	}
@@ -208,7 +212,7 @@ impl rlp::Encodable for EIP2930Transaction {
 		s.append(&self.value);
 		s.append(&self.input);
 		s.append_list(&self.access_list);
-		s.append(&self.signature.odd_y_parity());
+		s.append(&self.signature.y_parity());
 		s.append(&U256::from_big_endian(&self.signature.r()[..]));
 		s.append(&U256::from_big_endian(&self.signature.s()[..]));
 	}
@@ -230,10 +234,10 @@ impl rlp::Decodable for EIP2930Transaction {
 			input: rlp.val_at(6)?,
 			access_list: rlp.list_at(7)?,
 			signature: {
-				let odd_y_parity = rlp.val_at(8)?;
+				let y_parity = rlp.val_at(8)?;
 				let r = H256::from(rlp.val_at::<U256>(9)?.to_big_endian());
 				let s = H256::from(rlp.val_at::<U256>(10)?.to_big_endian());
-				TransactionSignature::new(odd_y_parity, r, s)
+				TransactionSignature::new(y_parity, r, s)
 					.ok_or(DecoderError::Custom("Invalid transaction signature format"))?
 			},
 		})

@@ -154,7 +154,7 @@ mod tests {
 				address: H160::zero(),
 				nonce: U256::zero(),
 				signature: eip2930::MalleableTransactionSignature {
-					odd_y_parity: false,
+					y_parity: false,
 					r: ONE,
 					s: ONE,
 				},

@@ -41,7 +41,11 @@ pub const AUTHORIZATION_MAGIC: u8 = 0x05;
 		scale_info::TypeInfo
 	)
 )]
-#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "with-serde",
+	derive(serde::Serialize, serde::Deserialize),
+	serde(rename_all = "camelCase")
+)]
 pub struct AuthorizationListItem {
 	pub chain_id: u64,
 	pub address: Address,
@@ -55,7 +59,7 @@ impl rlp::Encodable for AuthorizationListItem {
 		s.append(&self.chain_id);
 		s.append(&self.address);
 		s.append(&self.nonce);
-		s.append(&self.signature.odd_y_parity);
+		s.append(&self.signature.y_parity);
 		s.append(&U256::from_big_endian(&self.signature.r[..]));
 		s.append(&U256::from_big_endian(&self.signature.s[..]));
 	}
@@ -72,10 +76,10 @@ impl rlp::Decodable for AuthorizationListItem {
 			address: rlp.val_at(1)?,
 			nonce: rlp.val_at(2)?,
 			signature: {
-				let odd_y_parity = rlp.val_at(3)?;
+				let y_parity = rlp.val_at(3)?;
 				let r = H256::from(rlp.val_at::<U256>(4)?.to_big_endian());
 				let s = H256::from(rlp.val_at::<U256>(5)?.to_big_endian());
-				MalleableTransactionSignature { odd_y_parity, r, s }
+				MalleableTransactionSignature { y_parity, r, s }
 			},
 		})
 	}
@@ -87,11 +91,7 @@ impl AuthorizationListItem {
 	/// This checks that the signature is not malleable, but does not otherwise check or recover
 	/// the public key.
 	pub fn signature(&self) -> Option<TransactionSignature> {
-		TransactionSignature::new(
-			self.signature.odd_y_parity,
-			self.signature.r,
-			self.signature.s,
-		)
+		TransactionSignature::new(self.signature.y_parity, self.signature.r, self.signature.s)
 	}
 
 	/// Recover the authorizing address from the authorization signature according to EIP-7702
@@ -112,7 +112,7 @@ impl AuthorizationListItem {
 		let signature = Signature::from_bytes(&signature_bytes.into())
 			.map_err(|_| AuthorizationError::InvalidSignature)?;
 
-		let recovery_id = RecoveryId::try_from(if sigv.odd_y_parity() { 1u8 } else { 0u8 })
+		let recovery_id = RecoveryId::try_from(if sigv.y_parity() { 1u8 } else { 0u8 })
 			.map_err(|_| AuthorizationError::InvalidRecoveryId)?;
 
 		// Recover the verifying key using VerifyingKey::recover_from_prehash
@@ -228,7 +228,7 @@ impl rlp::Encodable for EIP7702Transaction {
 		s.append(&self.data);
 		s.append_list(&self.access_list);
 		s.append_list(&self.authorization_list);
-		s.append(&self.signature.odd_y_parity());
+		s.append(&self.signature.y_parity());
 		s.append(&U256::from_big_endian(&self.signature.r()[..]));
 		s.append(&U256::from_big_endian(&self.signature.s()[..]));
 	}
@@ -252,10 +252,10 @@ impl rlp::Decodable for EIP7702Transaction {
 			access_list: rlp.list_at(8)?,
 			authorization_list: rlp.list_at(9)?,
 			signature: {
-				let odd_y_parity = rlp.val_at(10)?;
+				let y_parity = rlp.val_at(10)?;
 				let r = H256::from(rlp.val_at::<U256>(11)?.to_big_endian());
 				let s = H256::from(rlp.val_at::<U256>(12)?.to_big_endian());
-				TransactionSignature::new(odd_y_parity, r, s)
+				TransactionSignature::new(y_parity, r, s)
 					.ok_or(DecoderError::Custom("Invalid transaction signature format"))?
 			},
 		})
@@ -361,7 +361,7 @@ mod tests {
 			address,
 			nonce,
 			signature: MalleableTransactionSignature {
-				odd_y_parity: y_parity,
+				y_parity: y_parity,
 				r,
 				s,
 			},
