@@ -41,11 +41,17 @@ pub const AUTHORIZATION_MAGIC: u8 = 0x05;
 		scale_info::TypeInfo
 	)
 )]
-#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "with-serde",
+	derive(serde::Serialize, serde::Deserialize),
+	serde(rename_all = "camelCase")
+)]
 pub struct AuthorizationListItem {
+	#[cfg_attr(feature = "with-serde", serde(with = "crate::util::hex_u64"))]
 	pub chain_id: u64,
 	pub address: Address,
 	pub nonce: U256,
+	#[cfg_attr(feature = "with-serde", serde(flatten))]
 	pub signature: MalleableTransactionSignature,
 }
 

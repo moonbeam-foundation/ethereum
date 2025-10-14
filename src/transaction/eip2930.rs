@@ -18,8 +18,16 @@ pub use super::legacy::TransactionAction;
 		scale_codec::DecodeWithMemTracking
 	)
 )]
-#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "with-serde",
+	derive(serde::Serialize, serde::Deserialize),
+	serde(rename_all = "camelCase")
+)]
 pub struct MalleableTransactionSignature {
+	#[cfg_attr(
+		feature = "with-serde",
+		serde(rename = "yParity", with = "crate::util::hex_bool")
+	)]
 	pub odd_y_parity: bool,
 	pub r: H256,
 	pub s: H256,

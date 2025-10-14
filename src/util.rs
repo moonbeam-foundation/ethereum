@@ -163,6 +163,63 @@ where
 	)
 }
 
+#[cfg(feature = "with-serde")]
+pub mod hex_u64 {
+	use serde::de::Error;
+	use serde::{Deserialize, Deserializer, Serializer};
+
+	/// Serialize a u64 as a hex string with 0x prefix
+	pub fn serialize<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let hex_str = alloc::format!("0x{:x}", value);
+		serializer.serialize_str(&hex_str)
+	}
+
+	/// Deserialize a hex string into a u64
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let s: &str = Deserialize::deserialize(deserializer)?;
+
+		// Remove optional "0x" prefix
+		let s = s.strip_prefix("0x").unwrap_or(s);
+
+		u64::from_str_radix(s, 16).map_err(D::Error::custom)
+	}
+}
+
+#[cfg(feature = "with-serde")]
+pub mod hex_bool {
+	use ethereum_types::U64;
+	use serde::de::Error;
+	use serde::{Deserialize, Deserializer, Serializer};
+
+	pub fn serialize<S>(b: &bool, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let hex_str = alloc::format!("0x{:x}", b.clone() as u8);
+		serializer.serialize_str(&hex_str)
+	}
+
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<bool, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let s: &str = Deserialize::deserialize(deserializer)?;
+
+		// Remove optional "0x" prefix
+		let s = s.strip_prefix("0x").unwrap_or(s);
+
+		u64::from_str_radix(s, 16)
+			.map(|v| v == 1)
+			.map_err(D::Error::custom)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use ethereum_types::H256;
