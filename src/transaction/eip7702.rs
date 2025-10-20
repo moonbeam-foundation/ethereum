@@ -62,8 +62,8 @@ impl rlp::Encodable for AuthorizationListItem {
 		s.append(&self.address);
 		s.append(&self.nonce);
 		s.append(&self.signature.odd_y_parity);
-		s.append(&U256::from_big_endian(&self.signature.r[..]));
-		s.append(&U256::from_big_endian(&self.signature.s[..]));
+		s.append(&self.signature.r);
+		s.append(&self.signature.s);
 	}
 }
 
@@ -79,8 +79,8 @@ impl rlp::Decodable for AuthorizationListItem {
 			nonce: rlp.val_at(2)?,
 			signature: {
 				let odd_y_parity = rlp.val_at(3)?;
-				let r = H256::from(rlp.val_at::<U256>(4)?.to_big_endian());
-				let s = H256::from(rlp.val_at::<U256>(5)?.to_big_endian());
+				let r = rlp.val_at::<U256>(4)?;
+				let s = rlp.val_at::<U256>(5)?;
 				MalleableTransactionSignature { odd_y_parity, r, s }
 			},
 		})
@@ -111,8 +111,8 @@ impl AuthorizationListItem {
 
 		// Create signature from r and s components
 		let mut signature_bytes = [0u8; 64];
-		signature_bytes[0..32].copy_from_slice(&sigv.r()[..]);
-		signature_bytes[32..64].copy_from_slice(&sigv.s()[..]);
+		signature_bytes[0..32].copy_from_slice(&sigv.r().to_big_endian());
+		signature_bytes[32..64].copy_from_slice(&sigv.s().to_big_endian());
 
 		// Create the signature and recovery ID
 		let signature = Signature::from_bytes(&signature_bytes.into())
@@ -235,8 +235,8 @@ impl rlp::Encodable for EIP7702Transaction {
 		s.append_list(&self.access_list);
 		s.append_list(&self.authorization_list);
 		s.append(&self.signature.odd_y_parity());
-		s.append(&U256::from_big_endian(&self.signature.r()[..]));
-		s.append(&U256::from_big_endian(&self.signature.s()[..]));
+		s.append(self.signature.r());
+		s.append(self.signature.s());
 	}
 }
 
@@ -259,8 +259,8 @@ impl rlp::Decodable for EIP7702Transaction {
 			authorization_list: rlp.list_at(9)?,
 			signature: {
 				let odd_y_parity = rlp.val_at(10)?;
-				let r = H256::from(rlp.val_at::<U256>(11)?.to_big_endian());
-				let s = H256::from(rlp.val_at::<U256>(12)?.to_big_endian());
+				let r = rlp.val_at::<U256>(11)?;
+				let s = rlp.val_at::<U256>(12)?;
 				TransactionSignature::new(odd_y_parity, r, s)
 					.ok_or(DecoderError::Custom("Invalid transaction signature format"))?
 			},
@@ -357,8 +357,8 @@ mod tests {
 
 		// Extract signature components
 		let signature_bytes = signature.to_bytes();
-		let r = H256::from_slice(&signature_bytes[0..32]);
-		let s = H256::from_slice(&signature_bytes[32..64]);
+		let r = U256::from_big_endian(&signature_bytes[0..32]);
+		let s = U256::from_big_endian(&signature_bytes[32..64]);
 		let y_parity = recovery_id.is_y_odd();
 
 		// Create AuthorizationListItem with real signature
@@ -401,8 +401,8 @@ mod tests {
 		// Test with invalid signature components (zero values are invalid in ECDSA)
 		assert!(TransactionSignature::new(
 			false,
-			H256::zero(), // Invalid r value (r cannot be zero)
-			H256::zero(), // Invalid s value (s cannot be zero)
+			U256::zero(), // Invalid r value (r cannot be zero)
+			U256::zero(), // Invalid s value (s cannot be zero)
 		)
 		.is_none());
 
@@ -411,8 +411,8 @@ mod tests {
 		assert!(TransactionSignature::new(
 			false,
 			// Use maximum possible values which exceed the curve order
-			H256::from_slice(&[0xFF; 32]),
-			H256::from_slice(&[0xFF; 32]),
+			U256::from_big_endian(&[0xFF; 32]),
+			U256::from_big_endian(&[0xFF; 32]),
 		)
 		.is_none());
 	}

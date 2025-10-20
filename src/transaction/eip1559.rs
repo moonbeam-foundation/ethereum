@@ -67,8 +67,8 @@ impl rlp::Encodable for EIP1559Transaction {
 		s.append(&self.input);
 		s.append_list(&self.access_list);
 		s.append(&self.signature.odd_y_parity());
-		s.append(&U256::from_big_endian(&self.signature.r()[..]));
-		s.append(&U256::from_big_endian(&self.signature.s()[..]));
+		s.append(self.signature.r());
+		s.append(self.signature.s());
 	}
 }
 
@@ -90,8 +90,8 @@ impl rlp::Decodable for EIP1559Transaction {
 			access_list: rlp.list_at(8)?,
 			signature: {
 				let odd_y_parity = rlp.val_at(9)?;
-				let r = H256::from(rlp.val_at::<U256>(10)?.to_big_endian());
-				let s = H256::from(rlp.val_at::<U256>(11)?.to_big_endian());
+				let r = rlp.val_at::<U256>(10)?;
+				let s = rlp.val_at::<U256>(11)?;
 				TransactionSignature::new(odd_y_parity, r, s)
 					.ok_or(DecoderError::Custom("Invalid transaction signature format"))?
 			},
