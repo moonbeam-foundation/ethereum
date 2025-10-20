@@ -356,7 +356,7 @@ mod tests {
 			),
 			value: U256::from(10) * 1_000_000_000 * 1_000_000_000,
 			input: hex!("a9059cbb000000000213ed0f886efd100b67c7e4ec0a85a7d20dc971600000000000000000000015af1d78b58c4000").into(),
-			signature: legacy::TransactionSignature::new(38, hex!("be67e0a07db67da8d446f76add590e54b6e92cb6b8f9835aeb67540579a27717").into(), hex!("2d690516512020171c1ec870f6ff45398cc8609250326be89915fb538e7bd718").into()).unwrap(),
+			signature: legacy::TransactionSignature::new(38, U256::from_big_endian(&hex!("be67e0a07db67da8d446f76add590e54b6e92cb6b8f9835aeb67540579a27717")), U256::from_big_endian(&hex!("2d690516512020171c1ec870f6ff45398cc8609250326be89915fb538e7bd718"))).unwrap(),
 		};
 
 		assert_eq!(
@@ -394,8 +394,12 @@ mod tests {
 			],
 			signature: eip2930::TransactionSignature::new(
 				false,
-				hex!("36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0").into(),
-				hex!("5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094").into(),
+				U256::from_big_endian(&hex!(
+					"36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0"
+				)),
+				U256::from_big_endian(&hex!(
+					"5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094"
+				)),
 			)
 			.unwrap(),
 		});
@@ -436,8 +440,12 @@ mod tests {
 			],
 			signature: eip2930::TransactionSignature::new(
 				false,
-				hex!("36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0").into(),
-				hex!("5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094").into(),
+				U256::from_big_endian(&hex!(
+					"36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0"
+				)),
+				U256::from_big_endian(&hex!(
+					"5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094"
+				)),
 			)
 			.unwrap(),
 		});
@@ -474,16 +482,22 @@ mod tests {
 				nonce: 1.into(),
 				signature: eip2930::MalleableTransactionSignature {
 					odd_y_parity: false,
-					r: hex!("36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0")
-						.into(),
-					s: hex!("5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094")
-						.into(),
+					r: U256::from_big_endian(&hex!(
+						"36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0"
+					)),
+					s: U256::from_big_endian(&hex!(
+						"5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094"
+					)),
 				},
 			}],
 			signature: eip2930::TransactionSignature::new(
 				false,
-				hex!("36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0").into(),
-				hex!("5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094").into(),
+				U256::from_big_endian(&hex!(
+					"36b241b061a36a32ab7fe86c7aa9eb592dd59018cd0443adc0903590c16b02b0"
+				)),
+				U256::from_big_endian(&hex!(
+					"5edcc541b4741c5cc6dd347c5ed9577ef293a62787b4510465fadbfe39ee4094"
+				)),
 			)
 			.unwrap(),
 		});

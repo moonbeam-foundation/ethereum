@@ -29,8 +29,8 @@ pub struct MalleableTransactionSignature {
 		serde(rename = "yParity", with = "crate::util::hex_bool")
 	)]
 	pub odd_y_parity: bool,
-	pub r: H256,
-	pub s: H256,
+	pub r: U256,
+	pub s: U256,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,25 +45,26 @@ pub struct MalleableTransactionSignature {
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize))]
 pub struct TransactionSignature {
 	odd_y_parity: bool,
-	r: H256,
-	s: H256,
+	r: U256,
+	s: U256,
 }
 
 impl TransactionSignature {
 	#[must_use]
-	pub fn new(odd_y_parity: bool, r: H256, s: H256) -> Option<Self> {
-		const LOWER: H256 = H256([
+	pub fn new(odd_y_parity: bool, r: U256, s: U256) -> Option<Self> {
+		let lower = U256::from_big_endian(&[
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x01,
 		]);
-		const UPPER: H256 = H256([
+
+		let upper = U256::from_big_endian(&[
 			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 			0xff, 0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c,
 			0xd0, 0x36, 0x41, 0x41,
 		]);
 
-		let is_valid = r < UPPER && r >= LOWER && s < UPPER && s >= LOWER;
+		let is_valid = r < upper && r >= lower && s < upper && s >= lower;
 
 		if is_valid {
 			Some(Self { odd_y_parity, r, s })
@@ -78,24 +79,24 @@ impl TransactionSignature {
 	}
 
 	#[must_use]
-	pub fn r(&self) -> &H256 {
+	pub fn r(&self) -> &U256 {
 		&self.r
 	}
 
 	#[must_use]
-	pub fn s(&self) -> &H256 {
+	pub fn s(&self) -> &U256 {
 		&self.s
 	}
 
 	#[must_use]
 	pub fn is_low_s(&self) -> bool {
-		const LOWER: H256 = H256([
+		let lower = U256::from_big_endian(&[
 			0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 			0xff, 0xff, 0x5d, 0x57, 0x6e, 0x73, 0x57, 0xa4, 0x50, 0x1d, 0xdf, 0xe9, 0x2f, 0x46,
 			0x68, 0x1b, 0x20, 0xa0,
 		]);
 
-		self.s <= LOWER
+		self.s <= lower
 	}
 }
 
@@ -217,8 +218,8 @@ impl rlp::Encodable for EIP2930Transaction {
 		s.append(&self.input);
 		s.append_list(&self.access_list);
 		s.append(&self.signature.odd_y_parity());
-		s.append(&U256::from_big_endian(&self.signature.r()[..]));
-		s.append(&U256::from_big_endian(&self.signature.s()[..]));
+		s.append(self.signature.r());
+		s.append(self.signature.s());
 	}
 }
 
@@ -239,8 +240,8 @@ impl rlp::Decodable for EIP2930Transaction {
 			access_list: rlp.list_at(7)?,
 			signature: {
 				let odd_y_parity = rlp.val_at(8)?;
-				let r = H256::from(rlp.val_at::<U256>(9)?.to_big_endian());
-				let s = H256::from(rlp.val_at::<U256>(10)?.to_big_endian());
+				let r = rlp.val_at::<U256>(9)?;
+				let s = rlp.val_at::<U256>(10)?;
 				TransactionSignature::new(odd_y_parity, r, s)
 					.ok_or(DecoderError::Custom("Invalid transaction signature format"))?
 			},
