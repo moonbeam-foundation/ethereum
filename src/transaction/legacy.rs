@@ -94,26 +94,27 @@ impl TransactionRecoveryId {
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize))]
 pub struct TransactionSignature {
 	v: TransactionRecoveryId,
-	r: H256,
-	s: H256,
+	r: U256,
+	s: U256,
 }
 
 impl TransactionSignature {
 	#[must_use]
-	pub fn new(v: u64, r: H256, s: H256) -> Option<Self> {
-		const LOWER: H256 = H256([
+	pub fn new(v: u64, r: U256, s: U256) -> Option<Self> {
+		let lower = U256::from_big_endian(&[
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x01,
 		]);
-		const UPPER: H256 = H256([
+
+		let upper = U256::from_big_endian(&[
 			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 			0xff, 0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c,
 			0xd0, 0x36, 0x41, 0x41,
 		]);
 
 		let v = TransactionRecoveryId(v);
-		let is_valid = v.standard() <= 1 && r < UPPER && r >= LOWER && s < UPPER && s >= LOWER;
+		let is_valid = v.standard() <= 1 && r < upper && r >= lower && s < upper && s >= lower;
 
 		if is_valid {
 			Some(Self { v, r, s })
@@ -138,24 +139,24 @@ impl TransactionSignature {
 	}
 
 	#[must_use]
-	pub fn r(&self) -> &H256 {
+	pub fn r(&self) -> &U256 {
 		&self.r
 	}
 
 	#[must_use]
-	pub fn s(&self) -> &H256 {
+	pub fn s(&self) -> &U256 {
 		&self.s
 	}
 
 	#[must_use]
 	pub fn is_low_s(&self) -> bool {
-		const LOWER: H256 = H256([
+		let lower = U256::from_big_endian(&[
 			0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 			0xff, 0xff, 0x5d, 0x57, 0x6e, 0x73, 0x57, 0xa4, 0x50, 0x1d, 0xdf, 0xe9, 0x2f, 0x46,
 			0x68, 0x1b, 0x20, 0xa0,
 		]);
 
-		self.s <= LOWER
+		self.s <= lower
 	}
 }
 
@@ -185,8 +186,8 @@ impl scale_codec::Decode for TransactionSignature {
 #[derive(serde::Deserialize)]
 struct TransactionSignatureUnchecked {
 	v: u64,
-	r: H256,
-	s: H256,
+	r: U256,
+	s: U256,
 }
 
 #[cfg(feature = "with-serde")]
@@ -253,8 +254,8 @@ impl rlp::Encodable for LegacyTransaction {
 		s.append(&self.value);
 		s.append(&self.input);
 		s.append(&self.signature.v.0);
-		s.append(&U256::from_big_endian(&self.signature.r[..]));
-		s.append(&U256::from_big_endian(&self.signature.s[..]));
+		s.append(&self.signature.r);
+		s.append(&self.signature.s);
 	}
 }
 
@@ -265,8 +266,8 @@ impl rlp::Decodable for LegacyTransaction {
 		}
 
 		let v = rlp.val_at(6)?;
-		let r = H256::from(rlp.val_at::<U256>(7)?.to_big_endian());
-		let s = H256::from(rlp.val_at::<U256>(8)?.to_big_endian());
+		let r = rlp.val_at::<U256>(7)?;
+		let s = rlp.val_at::<U256>(8)?;
 		let signature = TransactionSignature::new(v, r, s)
 			.ok_or(DecoderError::Custom("Invalid transaction signature format"))?;
 
