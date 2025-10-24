@@ -213,7 +213,7 @@ pub struct LegacyTransaction {
 
 impl LegacyTransaction {
 	pub fn hash(&self) -> H256 {
-		H256::from_slice(Keccak256::digest(rlp::encode(self)).as_slice())
+		H256::from_slice(Keccak256::digest(rlp::encode(self)).as_ref())
 	}
 
 	pub fn to_message(self) -> LegacyTransactionMessage {
@@ -281,7 +281,7 @@ pub struct LegacyTransactionMessage {
 
 impl LegacyTransactionMessage {
 	pub fn hash(&self) -> H256 {
-		H256::from_slice(Keccak256::digest(rlp::encode(self)).as_slice())
+		H256::from_slice(Keccak256::digest(rlp::encode(self)).as_ref())
 	}
 }
 

@@ -17,7 +17,7 @@ impl Hasher for KeccakHasher {
 	const LENGTH: usize = 32;
 
 	fn hash(x: &[u8]) -> Self::Out {
-		H256::from_slice(Keccak256::digest(x).as_slice())
+		H256::from_slice(Keccak256::digest(x).as_ref())
 	}
 }
 

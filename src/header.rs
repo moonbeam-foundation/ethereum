@@ -53,7 +53,7 @@ impl Header {
 
 	#[must_use]
 	pub fn hash(&self) -> H256 {
-		H256::from_slice(Keccak256::digest(rlp::encode(self)).as_slice())
+		H256::from_slice(Keccak256::digest(rlp::encode(self)).as_ref())
 	}
 }
 
