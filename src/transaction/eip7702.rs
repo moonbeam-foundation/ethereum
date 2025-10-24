@@ -342,7 +342,7 @@ mod tests {
 		rlp_stream.append(&address);
 		rlp_stream.append(&nonce);
 		message.extend_from_slice(&rlp_stream.out());
-		let message_hash = H256::from_slice(Keccak256::digest(&message).as_slice());
+		let message_hash = H256::from_slice(Keccak256::digest(&message).as_ref());
 
 		// Sign the message hash
 		let (signature, recovery_id) = signing_key
