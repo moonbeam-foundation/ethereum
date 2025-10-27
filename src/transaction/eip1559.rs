@@ -36,7 +36,7 @@ impl EIP1559Transaction {
 		let mut out = alloc::vec![0; 1 + encoded.len()];
 		out[0] = 2;
 		out[1..].copy_from_slice(&encoded);
-		H256::from_slice(Keccak256::digest(&out).as_slice())
+		H256::from_slice(Keccak256::digest(&out).as_ref())
 	}
 
 	pub fn to_message(self) -> EIP1559TransactionMessage {
@@ -118,7 +118,7 @@ impl EIP1559TransactionMessage {
 		let mut out = alloc::vec![0; 1 + encoded.len()];
 		out[0] = 2;
 		out[1..].copy_from_slice(&encoded);
-		H256::from_slice(Keccak256::digest(&out).as_slice())
+		H256::from_slice(Keccak256::digest(&out).as_ref())
 	}
 }
 

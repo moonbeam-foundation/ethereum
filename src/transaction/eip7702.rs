@@ -139,7 +139,7 @@ impl AuthorizationListItem {
 		message.extend_from_slice(&rlp_stream.out());
 
 		// Return keccak256 hash of the complete message
-		H256::from_slice(Keccak256::digest(&message).as_slice())
+		H256::from_slice(Keccak256::digest(&message).as_ref())
 	}
 
 	/// Convert VerifyingKey to Ethereum address
@@ -196,7 +196,7 @@ impl EIP7702Transaction {
 		let mut out = alloc::vec![0; 1 + encoded.len()];
 		out[0] = SET_CODE_TX_TYPE;
 		out[1..].copy_from_slice(&encoded);
-		H256::from_slice(Keccak256::digest(&out).as_slice())
+		H256::from_slice(Keccak256::digest(&out).as_ref())
 	}
 
 	pub fn to_message(self) -> EIP7702TransactionMessage {
@@ -282,7 +282,7 @@ impl EIP7702TransactionMessage {
 		let mut out = alloc::vec![0; 1 + encoded.len()];
 		out[0] = SET_CODE_TX_TYPE;
 		out[1..].copy_from_slice(&encoded);
-		H256::from_slice(Keccak256::digest(&out).as_slice())
+		H256::from_slice(Keccak256::digest(&out).as_ref())
 	}
 }
 
@@ -342,7 +342,7 @@ mod tests {
 		rlp_stream.append(&address);
 		rlp_stream.append(&nonce);
 		message.extend_from_slice(&rlp_stream.out());
-		let message_hash = H256::from_slice(Keccak256::digest(&message).as_slice());
+		let message_hash = H256::from_slice(Keccak256::digest(&message).as_ref());
 
 		// Sign the message hash
 		let (signature, recovery_id) = signing_key

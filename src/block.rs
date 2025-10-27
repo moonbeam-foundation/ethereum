@@ -58,7 +58,7 @@ impl<T: EnvelopedDecodable> rlp::Decodable for Block<T> {
 impl<T: EnvelopedEncodable> Block<T> {
 	pub fn new(partial_header: PartialHeader, transactions: Vec<T>, ommers: Vec<Header>) -> Self {
 		let ommers_hash =
-			H256::from_slice(Keccak256::digest(&rlp::encode_list(&ommers)[..]).as_slice());
+			H256::from_slice(Keccak256::digest(&rlp::encode_list(&ommers)[..]).as_ref());
 		let transactions_root = ordered_trie_root(
 			transactions
 				.iter()

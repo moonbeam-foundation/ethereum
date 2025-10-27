@@ -4,6 +4,7 @@ use ethereum_types::{Address, H256, U256};
 use rlp::{DecoderError, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
 
+use super::signature;
 use crate::Bytes;
 
 pub use super::legacy::TransactionAction;
@@ -44,18 +45,8 @@ pub struct TransactionSignature {
 impl TransactionSignature {
 	#[must_use]
 	pub fn new(odd_y_parity: bool, r: H256, s: H256) -> Option<Self> {
-		const LOWER: H256 = H256([
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x01,
-		]);
-		const UPPER: H256 = H256([
-			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-			0xff, 0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c,
-			0xd0, 0x36, 0x41, 0x41,
-		]);
-
-		let is_valid = r < UPPER && r >= LOWER && s < UPPER && s >= LOWER;
+		let is_valid = signature::is_valid_signature_component(&r)
+			&& signature::is_valid_signature_component(&s);
 
 		if is_valid {
 			Some(Self { odd_y_parity, r, s })
@@ -81,13 +72,7 @@ impl TransactionSignature {
 
 	#[must_use]
 	pub fn is_low_s(&self) -> bool {
-		const LOWER: H256 = H256([
-			0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-			0xff, 0xff, 0x5d, 0x57, 0x6e, 0x73, 0x57, 0xa4, 0x50, 0x1d, 0xdf, 0xe9, 0x2f, 0x46,
-			0x68, 0x1b, 0x20, 0xa0,
-		]);
-
-		self.s <= LOWER
+		signature::is_low_s(&self.s)
 	}
 }
 
@@ -180,7 +165,7 @@ impl EIP2930Transaction {
 		let mut out = alloc::vec![0; 1 + encoded.len()];
 		out[0] = 1;
 		out[1..].copy_from_slice(&encoded);
-		H256::from_slice(Keccak256::digest(&out).as_slice())
+		H256::from_slice(Keccak256::digest(&out).as_ref())
 	}
 
 	pub fn to_message(self) -> EIP2930TransactionMessage {
@@ -258,7 +243,7 @@ impl EIP2930TransactionMessage {
 		let mut out = alloc::vec![0; 1 + encoded.len()];
 		out[0] = 1;
 		out[1..].copy_from_slice(&encoded);
-		H256::from_slice(Keccak256::digest(&out).as_slice())
+		H256::from_slice(Keccak256::digest(&out).as_ref())
 	}
 }
 
