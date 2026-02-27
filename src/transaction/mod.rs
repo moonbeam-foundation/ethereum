@@ -2,6 +2,7 @@ pub mod eip1559;
 pub mod eip2930;
 pub mod eip7702;
 pub mod legacy;
+mod rlp_len;
 mod signature;
 
 use bytes::BytesMut;
@@ -26,6 +27,9 @@ impl EnvelopedEncodable for TransactionV0 {
 	}
 	fn encode_payload(&self) -> BytesMut {
 		rlp::encode(self)
+	}
+	fn payload_len(&self) -> usize {
+		self.rlp_len()
 	}
 }
 
@@ -75,6 +79,13 @@ impl EnvelopedEncodable for TransactionV1 {
 		match self {
 			Self::Legacy(tx) => rlp::encode(tx),
 			Self::EIP2930(tx) => rlp::encode(tx),
+		}
+	}
+
+	fn payload_len(&self) -> usize {
+		match self {
+			Self::Legacy(tx) => tx.rlp_len(),
+			Self::EIP2930(tx) => tx.rlp_len(),
 		}
 	}
 }
@@ -152,6 +163,14 @@ impl EnvelopedEncodable for TransactionV2 {
 			Self::Legacy(tx) => rlp::encode(tx),
 			Self::EIP2930(tx) => rlp::encode(tx),
 			Self::EIP1559(tx) => rlp::encode(tx),
+		}
+	}
+
+	fn payload_len(&self) -> usize {
+		match self {
+			Self::Legacy(tx) => tx.rlp_len(),
+			Self::EIP2930(tx) => tx.rlp_len(),
+			Self::EIP1559(tx) => tx.rlp_len(),
 		}
 	}
 }
@@ -259,6 +278,15 @@ impl EnvelopedEncodable for TransactionV3 {
 			Self::EIP2930(tx) => rlp::encode(tx),
 			Self::EIP1559(tx) => rlp::encode(tx),
 			Self::EIP7702(tx) => rlp::encode(tx),
+		}
+	}
+
+	fn payload_len(&self) -> usize {
+		match self {
+			Self::Legacy(tx) => tx.rlp_len(),
+			Self::EIP2930(tx) => tx.rlp_len(),
+			Self::EIP1559(tx) => tx.rlp_len(),
+			Self::EIP7702(tx) => tx.rlp_len(),
 		}
 	}
 }
