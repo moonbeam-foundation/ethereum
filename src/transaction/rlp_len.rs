@@ -24,18 +24,19 @@ pub(crate) trait RlpEncodableLen {
 
 /// Number of bytes required to RLP-encode a length value (used in long
 /// string / list headers).
+///
+/// Returns the minimal number of big-endian bytes needed to represent `len`.
+/// Callers only invoke this for `len > 55`, so `len` is never zero here;
+/// the guard is kept for defensive correctness.
 #[inline]
-fn length_of_length(len: usize) -> usize {
-	if len < 0x100 {
-		1
-	} else if len < 0x1_0000 {
-		2
-	} else if len < 0x100_0000 {
-		3
-	} else {
-		// Sufficient for any practical RLP payload (up to 4 GB).
-		4
+const fn length_of_length(len: usize) -> usize {
+	if len == 0 {
+		return 1;
 	}
+	// Equivalent to alloy-rlp's approach:
+	//   (usize::BITS as usize / 8) - (len.leading_zeros() as usize / 8)
+	// which counts the minimal big-endian bytes needed for `len`.
+	(usize::BITS as usize / 8) - (len.leading_zeros() as usize / 8)
 }
 
 /// Total RLP-encoded length of a *list* whose item payloads occupy
@@ -280,5 +281,113 @@ mod tests {
 	fn list_len_long() {
 		// 56-byte payload needs 1-byte length → header = 2 bytes
 		assert_eq!(rlp_list_len(56), 2 + 56);
+	}
+
+	// --- length_of_length boundary tests ---
+
+	#[test]
+	fn length_of_length_boundaries() {
+		// 1-byte range: 1..=0xFF
+		assert_eq!(length_of_length(1), 1);
+		assert_eq!(length_of_length(55), 1);
+		assert_eq!(length_of_length(0xFF), 1);
+
+		// 2-byte range: 0x100..=0xFFFF
+		assert_eq!(length_of_length(0x100), 2);
+		assert_eq!(length_of_length(0xFFFF), 2);
+
+		// 3-byte range: 0x1_0000..=0xFF_FFFF
+		assert_eq!(length_of_length(0x1_0000), 3);
+		assert_eq!(length_of_length(0xFF_FFFF), 3);
+
+		// 4-byte range: 0x100_0000..=0xFFFF_FFFF
+		assert_eq!(length_of_length(0x100_0000), 4);
+		assert_eq!(length_of_length(0xFFFF_FFFF_usize), 4);
+	}
+
+	#[cfg(target_pointer_width = "64")]
+	#[test]
+	fn length_of_length_above_4gib() {
+		// 5-byte range: 0x1_0000_0000..=0xFF_FFFF_FFFF
+		assert_eq!(length_of_length(0x1_0000_0000_usize), 5);
+		assert_eq!(length_of_length(0xFF_FFFF_FFFF_usize), 5);
+
+		// 6-byte range
+		assert_eq!(length_of_length(0x100_0000_0000_usize), 6);
+		assert_eq!(length_of_length(0xFFFF_FFFF_FFFF_usize), 6);
+
+		// 7-byte range
+		assert_eq!(length_of_length(0x1_0000_0000_0000_usize), 7);
+		assert_eq!(length_of_length(0xFF_FFFF_FFFF_FFFF_usize), 7);
+
+		// 8-byte range
+		assert_eq!(length_of_length(0x100_0000_0000_0000_usize), 8);
+		assert_eq!(length_of_length(usize::MAX), 8);
+	}
+
+	// --- rlp_list_header_len boundary tests ---
+
+	#[test]
+	fn list_header_len_boundaries() {
+		// Short list: payload ≤ 55 → header is 1 byte.
+		assert_eq!(rlp_list_header_len(0), 1);
+		assert_eq!(rlp_list_header_len(55), 1);
+
+		// Long list, 1-byte length: payload 56..=0xFF → header is 2 bytes.
+		assert_eq!(rlp_list_header_len(56), 2);
+		assert_eq!(rlp_list_header_len(0xFF), 2);
+
+		// Long list, 2-byte length: payload 0x100..=0xFFFF → header is 3 bytes.
+		assert_eq!(rlp_list_header_len(0x100), 3);
+		assert_eq!(rlp_list_header_len(0xFFFF), 3);
+
+		// Long list, 3-byte length → header is 4 bytes.
+		assert_eq!(rlp_list_header_len(0x1_0000), 4);
+		assert_eq!(rlp_list_header_len(0xFF_FFFF), 4);
+
+		// Long list, 4-byte length → header is 5 bytes.
+		assert_eq!(rlp_list_header_len(0x100_0000), 5);
+		assert_eq!(rlp_list_header_len(0xFFFF_FFFF_usize), 5);
+	}
+
+	#[cfg(target_pointer_width = "64")]
+	#[test]
+	fn list_header_len_above_4gib() {
+		// 5-byte length → header is 6 bytes.
+		assert_eq!(rlp_list_header_len(0x1_0000_0000_usize), 6);
+		assert_eq!(rlp_list_header_len(0xFF_FFFF_FFFF_usize), 6);
+
+		// 8-byte length → header is 9 bytes.
+		assert_eq!(rlp_list_header_len(usize::MAX), 9);
+	}
+
+	// --- byte-string rlp_len boundary tests ---
+
+	#[test]
+	fn bytes_len_boundary_0xff() {
+		let v = vec![0xab; 0xFF];
+		assert_eq!(v.as_slice().rlp_len(), 2 + 0xFF); // 1 prefix + 1 length byte + data
+		assert_eq!(v.as_slice().rlp_len(), rlp::encode(&v).len());
+	}
+
+	#[test]
+	fn bytes_len_boundary_0x100() {
+		let v = vec![0xab; 0x100];
+		assert_eq!(v.as_slice().rlp_len(), 3 + 0x100); // 1 prefix + 2 length bytes + data
+		assert_eq!(v.as_slice().rlp_len(), rlp::encode(&v).len());
+	}
+
+	#[test]
+	fn bytes_len_boundary_0xffff() {
+		let v = vec![0xab; 0xFFFF];
+		assert_eq!(v.as_slice().rlp_len(), 3 + 0xFFFF); // 1 prefix + 2 length bytes + data
+		assert_eq!(v.as_slice().rlp_len(), rlp::encode(&v).len());
+	}
+
+	#[test]
+	fn bytes_len_boundary_0x1_0000() {
+		let v = vec![0xab; 0x1_0000];
+		assert_eq!(v.as_slice().rlp_len(), 4 + 0x1_0000); // 1 prefix + 3 length bytes + data
+		assert_eq!(v.as_slice().rlp_len(), rlp::encode(&v).len());
 	}
 }
