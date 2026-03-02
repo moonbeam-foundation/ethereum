@@ -3,6 +3,7 @@ pub mod eip2930;
 pub mod eip7702;
 pub mod legacy;
 mod rlp_len;
+mod signature;
 
 use bytes::BytesMut;
 use ethereum_types::H256;
