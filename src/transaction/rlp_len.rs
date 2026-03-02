@@ -33,9 +33,7 @@ const fn length_of_length(len: usize) -> usize {
 	if len == 0 {
 		return 1;
 	}
-	// Equivalent to alloy-rlp's approach:
-	//   (usize::BITS as usize / 8) - (len.leading_zeros() as usize / 8)
-	// which counts the minimal big-endian bytes needed for `len`.
+	// Minimal big-endian bytes needed to represent `len`.
 	(usize::BITS as usize / 8) - (len.leading_zeros() as usize / 8)
 }
 
